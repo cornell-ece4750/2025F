@@ -6,7 +6,7 @@ on RTL design with Verilog for the Fall 2025 offering.
 
 You can find the section handout here:
 
- - [index.md](index.md)
+ - [docs/index.md](docs/index.md)
 
 Or online here:
 
