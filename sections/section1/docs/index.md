@@ -1,5 +1,8 @@
+---
+title: "ECE 4750 Section 1 – RTL Design with Verilog"
+---
 
-ECE 4750 Section 1: RTL Design with Verilog
+# ECE 4750 Section 1: RTL Design with Verilog
 ==========================================================================
 
 **Table of Contents**
