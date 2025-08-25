@@ -486,4 +486,3 @@ which make use of stream interfaces. We will then be able to use these
 multipliers in the processor you design in lab 2. If the processor
 correctly adheres to the val/rdy micro-protocol then it will function
 correctly regardless of the latency of the multiplier.
-
