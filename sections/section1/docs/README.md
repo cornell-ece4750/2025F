@@ -17,8 +17,8 @@ setup script.
     % source setup-ece4750.sh
     % mkdir -p $HOME/ece4750
     % cd $HOME/ece4750
-    % git clone git@github.com:cornell-ece4750/2025F.git ece4750-2025f
-    % cd ece4750-2025f/sections/section1
+    % git clone git@github.com:cornell-ece4750/2025F.git
+    % cd 2025F/sections/section1
     % TOPDIR=$PWD
 
 Verilog RTL for Single-Cycle Multiplier
