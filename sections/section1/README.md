@@ -10,5 +10,5 @@ You can find the section handout here:
 
 Or online here:
 
- - https://cornell-ece4750.github.io/2025F/sections/section1/
+ - https://cornell-ece4750.github.io/2025F/sections/section1/docs/
 

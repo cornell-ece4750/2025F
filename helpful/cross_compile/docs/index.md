@@ -15,7 +15,7 @@ Let's compile the very first program you saw in ECE 2400. First make sure
 we have a directory to work in:
 
     % mkdir -p ${HOME}/ece4750/2025F/helpful/cross_compile
-    % cd ${HOME}/ece4750/2025F/cross_compile
+    % cd ${HOME}/ece4750/2025F/helpful/cross_compile
 
 Then use your favorite text editor to create a file named `avg-main.c`.
 
