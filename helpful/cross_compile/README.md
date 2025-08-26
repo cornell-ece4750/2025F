@@ -10,6 +10,6 @@ document in the repo here:
 
 Or online here:
 
- - https://cornell-ece4750.github.io/2025F/helpful/cross_compile/
+ - https://cornell-ece4750.github.io/2025F/helpful/cross_compile/docs/
 
 

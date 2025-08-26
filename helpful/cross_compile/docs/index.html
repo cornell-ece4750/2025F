@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Cross-compile a simple C program for RISC-V RV32IM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link rel="stylesheet" href="assets/css/style.css">
+  </head>
+  <body>
+    <section class="main-content">
+
+      <h1
+      id="cross-compile-a-simple-c-program-for-risc-v-rv32im">Cross-compile
+      a simple C program for RISC-V RV32IM</h1>
+      <p><strong>Table of Contents</strong></p>
+      <ul>
+      <li>Compile a simple C program for Intel x86</li>
+      <li>Cross-compile a simple C program for RISC-V RV32IM</li>
+      </ul>
+      <h3 id="compile-a-simple-c-program-for-intel-x86">Compile a simple
+      C program for Intel x86</h3>
+      <p>Let’s compile the very first program you saw in ECE 2400. First
+      make sure we have a directory to work in:</p>
+      <pre><code>% mkdir -p ${HOME}/ece4750/2025F/helpful/cross_compile
+% cd ${HOME}/ece4750/2025F/helpful/cross_compile</code></pre>
+      <p>Then use your favorite text editor to create a file named
+      <code>avg-main.c</code>.</p>
+      <pre><code>#include &lt;stdio.h&gt;
+
+int avg( int x, int y )
+{
+  int sum = x + y;
+  return sum / 2;
+}
+
+int main()
+{
+  int a = 10;
+  int b = 20;
+  int c = avg( a, b );
+  printf( &quot;average of %d and %d is %d\n&quot;, a, b, c );
+  return  0;
+}</code></pre>
+      <p>Recall how to compile this C program into an x86 binary and
+      execute this binary on the <code>ecelinux</code> server.</p>
+      <pre><code>% cd ${HOME}/ece4750/2025F/helpful/cross_compile
+% gcc -Wall -o avg-main avg-main.c
+% ./avg-main</code></pre>
+      <h3
+      id="cross-compile-a-simple-c-program-for-risc-v-rv32im-1">Cross-compile
+      a simple C program for RISC-V RV32IM</h3>
+      <p>In this course, we will be using the RISC-V instruction set
+      architecture instead of the x86 instruction set architecture. You
+      can use a <em>cross-compiler</em> to compile a C program into a
+      RISC-V binary like this:</p>
+      <pre><code>% cd ${HOME}/ece4750/2025F/helpful/cross_compile
+% riscv32-unknown-elf-gcc -O3 -o avg-main-riscv avg-main.c</code></pre>
+      <p>Now let’s take a look at the actual RISCV instructions using
+      <code>riscv32-objdump</code>:</p>
+      <pre><code>% riscv32-objdump avg-main-riscv</code></pre>
+      <p>See if you can find the instructions that correspond to the
+      <code>avg</code> function. See if you can figure out how the C
+      code maps to these RISCV instructions. Use the TinyRV2 instruction
+      set architecture manual located here:</p>
+      <ul>
+      <li><a
+      href="https://www.csl.cornell.edu/courses/ece4750/handouts/ece4750-tinyrv-isa.txt"
+      class="uri">https://www.csl.cornell.edu/courses/ece4750/handouts/ece4750-tinyrv-isa.txt</a></li>
+      </ul>
+      <p>Experiment with the following variation and look at the
+      corresponding RISCV instructions.</p>
+      <pre><code>unsigned int avg( unsigned int x, unsigned int y )
+{
+  unsigned int sum = x + y;
+  return sum / 2;
+}</code></pre>
+      <p>Can you explain the difference from the original version of
+      this code?</p>
+      <h3 id="execute-risc-v-instructions-on-a-simulator">Execute RISC-V
+      instructions on a simulator</h3>
+      <p>CS 3410 uses a neat RISC-V simulator which works in your
+      browser:</p>
+      <ul>
+      <li><a
+      href="https://www.cs.cornell.edu/courses/cs3410/2019sp/riscv/interpreter"
+      class="uri">https://www.cs.cornell.edu/courses/cs3410/2019sp/riscv/interpreter</a></li>
+      </ul>
+      <p>Try copying the RISC-V instructions for just the
+      <code>avg</code> function into this RISC-V interpreter. Then
+      execute instruction step-by-step and verify they behave as
+      expected.</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-credits">This page was generated
+        with Pandoc using a modified version of the Cayman theme.</span>
+      </footer>
+    </section>
+  </body>
+</html>
