@@ -49,6 +49,7 @@ In this course, we will be using the RISC-V instruction set architecture
 instead of the x86 instruction set architecture. You can use a
 _cross-compiler_ to compile a C program into a RISC-V binary like this:
 
+    % source setup-ece4750.sh
     % cd ${HOME}/ece4750/2025F/helpful/cross_compile
     % riscv32-unknown-elf-gcc -O3 -o avg-main-riscv avg-main.c
 
