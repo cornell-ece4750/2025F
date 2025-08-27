@@ -54,7 +54,8 @@ int main()
       architecture instead of the x86 instruction set architecture. You
       can use a <em>cross-compiler</em> to compile a C program into a
       RISC-V binary like this:</p>
-      <pre><code>% cd ${HOME}/ece4750/2025F/helpful/cross_compile
+      <pre><code>% source setup-ece4750.sh
+% cd ${HOME}/ece4750/2025F/helpful/cross_compile
 % riscv32-unknown-elf-gcc -O3 -o avg-main-riscv avg-main.c</code></pre>
       <p>Now let’s take a look at the actual RISCV instructions using
       <code>riscv32-objdump</code>:</p>
