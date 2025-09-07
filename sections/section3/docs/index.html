@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>ECE 4750 Section 3: Lab 2 Head Start</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link rel="stylesheet" href="assets/css/style.css">
+  </head>
+  <body>
+    <section class="main-content">
+
+      <h1 id="ece-4750-section-3-lab-2-head-start"># ECE 4750 Section 3:
+      Lab 2 Head Start</h1>
+      <p><strong>Table of Contents</strong></p>
+      <ul>
+      <li>TinyRV2 Processor Walk-Through</li>
+      <li>Testing the ADD Instruction</li>
+      <li>Implementing and Testing the ADDI Instruction</li>
+      <li>Evaluating an Accumulate Function</li>
+      </ul>
+      <p>This discussion section serves to introduce students to the
+      basic processor modeling approach and testing strategy we will be
+      using to implement a pipelined TinyRV2 processor in lab 2. You
+      should log into the <code>ecelinux</code> servers using the remote
+      access option of your choice and then source the setup script.</p>
+      <pre><code>% source setup-ece4750.sh
+% cd $HOME/ece4750/2025F
+% git pull
+% cd sections/section3     
+% TOPDIR=$PWD
+% mkdir $TOPDIR/build</code></pre>
+      <h2 id="tinyrv2-processor-walk-through">TinyRV2 Processor
+      Walk-Through</h2>
+      <p>The following figure shows the high-level interface for our
+      TinyRV2 processor. The procesor has an independent instruction
+      memory and data memory interface along with a mngr2proc and
+      proc2mngr stream interface for testing purposes. All interfaces
+      are implemented using the latency-insensitive val/rdy
+      micro-protocol.</p>
+      <p><img src="assets/fig/lab2-proc-ifc.png" /></p>
+      <p>We provide students a complete functional-level model of a
+      processor that implements the above interface and can be used as a
+      reference. You can find the FL model in
+      <code>lab2_proc/ProcFL.py</code>. This is what the interface looks
+      like in Verilog for an RTL implementation of the TinyRV2
+      process.</p>
+      <pre><code>module lab2_proc_ProcSimple
+#(
+  parameter p_num_cores = 1
+)
+(
+  input  logic         clk,
+  input  logic         reset,
+
+  // From mngr streaming port
+
+  input  logic [31:0]  mngr2proc_msg,
+  input  logic         mngr2proc_val,
+  output logic         mngr2proc_rdy,
+
+  // To mngr streaming port
+
+  output logic [31:0]  proc2mngr_msg,
+  output logic         proc2mngr_val,
+  input  logic         proc2mngr_rdy,
+
+  // Instruction Memory Request Port
+
+  output mem_req_4B_t  imem_reqstream_msg,
+  output logic         imem_reqstream_val,
+  input  logic         imem_reqstream_rdy,
+
+  // Instruction Memory Response Port
+
+  input  mem_resp_4B_t imem_respstream_msg,
+  input  logic         imem_respstream_val,
+  output logic         imem_respstream_rdy,
+
+  // Data Memory Request Port
+
+  output mem_req_4B_t  dmem_reqstream_msg,
+  output logic         dmem_reqstream_val,
+  input  logic         dmem_reqstream_rdy,
+
+  // Data Memory Response Port
+
+  input  mem_resp_4B_t dmem_respstream_msg,
+  input  logic         dmem_respstream_val,
+  output logic         dmem_respstream_rdy,
+
+  // extra ports
+
+  input  logic [31:0]  core_id,
+  output logic         commit_inst,
+  output logic         stats_en
+
+);</code></pre>
+      <p>Notice there are some extra ports to set the core id and for
+      statistics, and that we are using SystemVerilog structs to encode
+      the memory requests and responses. Here is the memory request
+      struct format:</p>
+      <pre><code> 76  74 73           66 65              34 33  32 31               0
++------+---------------+------------------+------+------------------+
+| type | opaque        | addr             | len  | data             |
++------+---------------+------------------+------+------------------+</code></pre>
+      <p>And here is the memory response struct format:</p>
+      <pre><code> 46  44 43           36 35  34 33  32 31               0
++------+---------------+------+------+------------------+
+| type | opaque        | test | len  | data             |
++------+---------------+------+------+------------------+</code></pre>
+      <p>The full TinyRV2 instruction set includes the following
+      instructions:</p>
+      <ul>
+      <li>CSR: <code>csrr, csrw</code></li>
+      <li>Reg-Reg:
+      <code>add, sub, mul, and, or, xor, slt, sltu, sra, srl, sll</code></li>
+      <li>Reg-Imm:
+      <code>addi, ori, andi, xori, slti, sltiu, srai, srli, slli, lui, auipc</code></li>
+      <li>Memory: <code>lw, sw</code></li>
+      <li>Jump: <code>jal, jalr</code></li>
+      <li>Branch: <code>bne, beq, blt, bltu, bge, bgeu</code></li>
+      </ul>
+      <p>In this discussion section, we provide you a simple processor
+      implementation that implements ADD, LW, BNE, CSRR, and CSRW. The
+      block diagram for how the control unit and datapath unit are
+      composed is shown below.</p>
+      <p><img src="assets/fig/lab2-proc-dpath-ctrl.png" /></p>
+      <p>The datapath for this simple processor is shown below.</p>
+      <p><img src="assets/fig/lab2-proc-simple-dpath-tinyrv2.png" /></p>
+      <p>Take a look at the code in the following files to learn more
+      about how the simple processor is implemented.</p>
+      <ul>
+      <li><code>lab2_proc/ProcSimpleDpath.v</code></li>
+      <li><code>lab2_proc/ProcSimpleCtrl.v</code></li>
+      <li><code>lab2_proc/ProcSimple.v</code></li>
+      </ul>
+      <h2 id="testing-the-add-instruction">Testing the ADD
+      Instruction</h2>
+      <p>Let’s take a look at a basic test for the ADD instruction. They
+      primary way we will test our processors is by writing very small
+      <em>assembly test programs</em>. Take a look at the test in
+      <code>lab2_proc/test/simple_add_test.py</code> to see how to write
+      such assembly test programs.</p>
+      <pre><code>def test_add_sm( cmdline_opts ):
+
+  prog=&quot;&quot;&quot;
+    csrr x1, mngr2proc &lt; 5
+    csrr x2, mngr2proc &lt; 4
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    add x3, x1, x2
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    csrw proc2mngr, x3 &gt; 9
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+  &quot;&quot;&quot;
+
+  run_test( ProcSimple, prog, cmdline_opts=cmdline_opts )</code></pre>
+      <p>Our assembly test program is just a multiline string with one
+      assembly instruction per line, which we can then pass in to the
+      <code>run_test</code> helper function. There are two special
+      control status registers (CSR) that we will use extensively in
+      testing. If we read the <code>mngr2proc</code> CSR using a CSRR
+      instruction, then this deques a message from the
+      <code>mngr2proc</code> stream interface (the message comes from
+      the stream source) and writes it to the given general purpose
+      register. If we write the <code>mngr2proc</code> CSR using a CSRW
+      instruction, then this enqueues a message onto the
+      <code>proc2mngr</code> stream interface (the message goes to the
+      stream sink). We can use the <code>&lt;</code> symbol to specify
+      in the assembly code what value we want the stream source to send
+      to the processor for that instruction, and we can use the
+      <code>&gt;</code> symbol to specify in the assembly code what
+      value we want the stream sink to check for that instruction.</p>
+      <p>You should always make sure your tests pass on the FL model
+      before using them to test your RTL model. Let’s run the above test
+      on our FL model.</p>
+      <pre><code>% cd $TOPDIR/build
+% pytest ../lab2_proc/test/simple_add_test.py -s</code></pre>
+      <p>Use the <code>-s</code> command line option so you can see the
+      linetrace. Verify that the instructions you think should be
+      executing are indeed executing on the FL model. Now let’s try the
+      same test on the simple processor. Modify <code>run_test</code> to
+      use the <code>ProcSimple</code> like this:</p>
+      <p>run_test( ProcSimple, prog, cmdline_opts=cmdline_opts )</p>
+      <p>Then rerun the test and look at the line trace. It should look
+      something like this:</p>
+      <pre><code> 1r .        &gt;          |                       |    |    |    |[ ]                         &gt;                  [  ]| &gt;
+ 2r .        &gt;          |                       |    |    |    |[ ]                         &gt;                  [  ]| &gt;
+ 3: .        &gt;          |                       |    |    |    |[ ]rd:00:00000200:0:        &gt;                  [  ]| &gt;
+ 4: #        &gt;  00000200|                       |    |    |    |[ ]rd:00:00000204:0:        &gt;rd:00:0:0:fc0020f3[ *]| &gt;
+ 5: 00000005 &gt;  00000204|csrr   x01, mngr2proc  |    |    |    |[ ]rd:00:00000208:0:        &gt;rd:00:0:0:fc002173[ *]| &gt;
+ 6: 00000004 &gt;  00000208|csrr   x02, mngr2proc  |csrr|    |    |[ ]rd:00:0000020c:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+ 7: .        &gt;  0000020c|nop                    |csrr|csrr|    |[ ]rd:00:00000210:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+ 8: .        &gt;  00000210|nop                    |nop |csrr|csrr|[ ]rd:00:00000214:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+ 9: .        &gt;  00000214|nop                    |nop |nop |csrr|[ ]rd:00:00000218:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+10: .        &gt;  00000218|nop                    |nop |nop |nop |[ ]rd:00:0000021c:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+11: .        &gt;  0000021c|nop                    |nop |nop |nop |[ ]rd:00:00000220:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+12: .        &gt;  00000220|nop                    |nop |nop |nop |[ ]rd:00:00000224:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+13: .        &gt;  00000224|nop                    |nop |nop |nop |[ ]rd:00:00000228:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+14: .        &gt;  00000228|nop                    |nop |nop |nop |[ ]rd:00:0000022c:0:        &gt;rd:00:0:0:002081b3[ *]| &gt;
+15: .        &gt;  0000022c|add    x03, x01, x02   |nop |nop |nop |[ ]rd:00:00000230:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+16: .        &gt;  00000230|nop                    |add |nop |nop |[ ]rd:00:00000234:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+17: .        &gt;  00000234|nop                    |nop |add |nop |[ ]rd:00:00000238:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+18: .        &gt;  00000238|nop                    |nop |nop |add |[ ]rd:00:0000023c:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+19: .        &gt;  0000023c|nop                    |nop |nop |nop |[ ]rd:00:00000240:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+20: .        &gt;  00000240|nop                    |nop |nop |nop |[ ]rd:00:00000244:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+21: .        &gt;  00000244|nop                    |nop |nop |nop |[ ]rd:00:00000248:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+22: .        &gt;  00000248|nop                    |nop |nop |nop |[ ]rd:00:0000024c:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+23: .        &gt;  0000024c|nop                    |nop |nop |nop |[ ]rd:00:00000250:0:        &gt;rd:00:0:0:7c019073[ *]| &gt;
+24: .        &gt;  00000250|csrw   proc2mngr, x03  |nop |nop |nop |[ ]rd:00:00000254:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+25: .        &gt;  00000254|nop                    |csrw|nop |nop |[ ]rd:00:00000258:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+26: .        &gt;  00000258|nop                    |nop |csrw|nop |[ ]rd:00:0000025c:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+27: .        &gt;  0000025c|nop                    |nop |nop |csrw|[ ]rd:00:00000260:0:        &gt;rd:00:0:0:00000013[ *]| &gt; 00000009
+28: .        &gt;  00000260|nop                    |nop |nop |nop |[ ]rd:00:00000264:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+29: .        &gt;  00000264|nop                    |nop |nop |nop |[ ]rd:00:00000268:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+30: .        &gt;  00000268|nop                    |nop |nop |nop |[ ]rd:00:0000026c:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+31: .        &gt;  0000026c|nop                    |nop |nop |nop |[ ]rd:00:00000270:0:        &gt;rd:00:0:0:00000013[ *]| &gt;
+32: .        &gt;  00000270|nop                    |nop |nop |nop |[ ]rd:00:00000274:0:        &gt;rd:00:0:0:fc0020f3[ *]| &gt;</code></pre>
+      <p>Now add a new test function to
+      <code>lab2_proc/test/simple_add_test.py</code> named
+      <code>test_add_lg</code> which is similar to
+      <code>test_add_sm</code> but uses two larger input values. Verify
+      your test passes on both <code>ProcFL</code> and
+      <code>ProcSimple</code>.</p>
+      <h2
+      id="implementing-and-testing-the-addi-instruction">Implementing
+      and Testing the ADDI Instruction</h2>
+      <p>Now let’s add the ADDI instruction to our simple processor. It
+      is critical to always take an incremental approach. Add a single
+      instruction to your processor. Do lots of testing and only once
+      you are confident you have covered all of the corner cases should
+      you move on to adding another instruction.</p>
+      <p>Use the given handout to plan your implementation. Make sure
+      you understand how the control signals are set for the ADD
+      instruction. Draw any modifications you need to the datapath, add
+      any control signals you need to the control signal table, and then
+      fill out the row in the control signal table for the ADDI
+      instruction. Here are the explanations of each control signal:</p>
+      <ul>
+      <li><p><code>val</code> : whether or not the instruction is valid;
+      should be <code>y</code> for all instructions; basically a way to
+      determine if this is a valid instruction or not for debugging
+      purposes</p></li>
+      <li><p><code>br type</code> : is either <code>br_na</code> if this
+      is not a branch or <code>br_bne</code> if this is a BNE
+      operation</p></li>
+      <li><p><code>imm type</code> : immediate format corresponding to
+      the TinyRV2 instruction set manual. <code>imm_i</code> is for
+      I-type immediate format and <code>imm_b</code> is for B-type
+      immediate format</p></li>
+      <li><p><code>rs1 en</code> : set to <code>n</code> if this
+      instruction <em>does not</em> use the <code>rs1</code> field and
+      set to <code>y</code> if this instruction <em>does</em> use the
+      <code>rs1</code> field; used for dependency checking</p></li>
+      <li><p><code>op2 muxsel</code> : mux select control signal for the
+      op2 mux; use <code>bm_rf</code> to choose the value from the
+      register file, use <code>bm_imm</code> to choose the value from
+      the immediate generation unit, use <code>csr</code> to choose the
+      value from the CSR mux</p></li>
+      <li><p><code>rs2 en</code> : set to <code>n</code> if this
+      instruction <em>does not</em> use the <code>rs2</code> field and
+      set to <code>y</code> if this instruction <em>does</em> use the
+      <code>rs2</code> field; used for dependency checking</p></li>
+      <li><p><code>alu fn</code> : ALU function control signal; use
+      <code>alu_add</code> for the ALU to do an add; use
+      <code>alu_cp0</code> for the ALU to copy op0 to the output; use
+      <code>alu_cp1</code> for the ALU to copy op1 to the
+      output</p></li>
+      <li><p><code>dmm type</code> : the type of data memory operation;
+      use <code>nr</code> if this is not a memory request; use
+      <code>ld</code> if this is a load</p></li>
+      <li><p><code>wbmux sel</code> : mux select control signal for
+      writeback mux; use <code>wm_a</code> to choose the value from the
+      ALU; use <code>wm_m</code> to choose the value from the data
+      memory</p></li>
+      <li><p><code>rf wen</code> : register file write enable; set to
+      <code>n</code> if this instruction <em>does not</em> need to write
+      the register file; set to <code>y</code> if this instruction
+      <em>does</em> need to write the register file</p></li>
+      <li><p><code>csrr</code>/<code>csrw</code> : whether this is a
+      CSRR or CSRW instruction</p></li>
+      </ul>
+      <p>Once you have the control signal table filled out on paper, go
+      ahead and add a new row to the control signal table in
+      <code>lab2_proc/ProcSimpleCtrl.v</code>:</p>
+      <pre><code>always_comb begin
+  casez ( inst_D )
+    //                            br      imm   rs1 op2    rs2 alu      dmm wbmux rf
+    //                       val  type    type   en muxsel  en fn       typ sel   wen csrr csrw
+    `TINYRV2_INST_NOP     :cs( y, br_na,  imm_x, n, bm_x,   n, alu_x,   nr, wm_a, n,  n,   n    );
+    `TINYRV2_INST_ADD     :cs( y, br_na,  imm_x, y, bm_rf,  y, alu_add, nr, wm_a, y,  n,   n    );
+    `TINYRV2_INST_LW      :cs( y, br_na,  imm_i, y, bm_imm, n, alu_add, ld, wm_m, y,  n,   n    );
+    `TINYRV2_INST_BNE     :cs( y, br_bne, imm_b, y, bm_rf,  y, alu_x,   nr, wm_a, n,  n,   n    );
+    `TINYRV2_INST_CSRR    :cs( y, br_na,  imm_i, n, bm_csr, n, alu_cp1, nr, wm_a, y,  y,   n    );
+    `TINYRV2_INST_CSRW    :cs( y, br_na,  imm_i, y, bm_rf,  n, alu_cp0, nr, wm_a, n,  n,   y    );
+  endcase
+end</code></pre>
+      <p>Create a new test case in
+      <code>lab2_proc/test/simple_addi_test.py</code> similar in spirit
+      to the test cases we used to test the ADD instruction. Then run
+      your test case on both <code>ProcFL</code> and
+      <code>ProcSimple</code>. Look at the line trace to confirm your
+      test case is doing what you expect on <code>ProcSimple</code>.</p>
+      <pre><code>% cd $TOPDIR/build
+% pytest ../lab2_proc/test/simple_addi_test.py -v</code></pre>
+      <p>Writing assembly test cases can be very tedious. We can use the
+      Python to help automate the process of <em>generating</em> test
+      cases. You can see an example of functions that generate assembly
+      test programs in <code>inst_add.py</code> and then you can see
+      using these test programs in <code>ProcSimple_test.py</code>. Go
+      ahead and run all of the provided tests on <code>ProcFL</code> and
+      <code>ProcSimple</code> like this:</p>
+      <pre><code>% cd $TOPDIR/build
+% pytest ../lab2_proc/test -v</code></pre>
+      <h2 id="evaluating-an-accumulate-function">Evaluating an
+      Accumulate Function</h2>
+      <p>Now let’s try to run the assembly for a simple C function on
+      the simple processor and start to look at its performance. Write
+      out the TinyRV2 assembly code that implements this C function:</p>
+      <pre><code>int accumulate( int* a, int n )
+{
+  int sum = 0;
+  for ( int i = 0; i &lt; n; i++ ) {
+    int b = a[i];
+    sum   = sum + b;
+  }
+  return sum;
+}</code></pre>
+      <p>You should only use the instructions we have implemented in the
+      simple processor (ADD, ADDI, LW, BNE). Once you have the assembly,
+      add it to the
+      <code>lab2_proc/test/simple_accumulate_test.py</code> test script.
+      Then try running the program on both <code>ProcFL</code> and
+      <code>ProcSimple</code> like this:</p>
+      <pre><code>% cd $TOPDIR/build
+% pytest ../lab2_proc/test/simple_accumulate_test.py -v</code></pre>
+      <p>Take a look at the line trace to estimate the number of cycles
+      per iteration.</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-credits">This page was generated
+        with Pandoc using a modified version of the Cayman theme.</span>
+      </footer>
+    </section>
+  </body>
+</html>

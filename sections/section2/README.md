@@ -2,7 +2,7 @@
 ECE 4750 Section 2: RTL Testing with Python
 ==========================================================================
 
-This repository contains the code and documentation for ECE 4750 Section
+This folder contains the code and documentation for ECE 4750 Section
 2 on the RTL testing with Python. You can find the actual section
 document in the repo here:
 
