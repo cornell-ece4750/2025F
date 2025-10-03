@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>ECE 4750 Section 6: Lab 3 Head Start</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link rel="stylesheet" href="assets/css/style.css">
+  </head>
+  <body>
+    <section class="main-content">
+
+      <h1 id="ece-4750-section-6-lab-3-head-start"># ECE 4750 Section 6:
+      Lab 3 Head Start</h1>
+      <p><strong>Table of Contents</strong></p>
+      <ul>
+      <li>Cache Walk-Through</li>
+      <li>Using the Cache Functional-Level Model</li>
+      <li>Implementing and Testing Write Init Transaction</li>
+      <li>More Testing</li>
+      </ul>
+      <p>This discussion section serves to introduce students to the
+      basic cache modeling approach and testing strategy we will be
+      using to implement a blocking FSM cache in lab 3. You should log
+      into the <code>ecelinux</code> servers using the remote access
+      option of your choice and then source the setup script.</p>
+      <pre><code>% source setup-ece4750.sh
+% cd $HOME/ece4750/2025F
+% git pull
+% cd sections/section6     
+% TOPDIR=$PWD
+% mkdir $TOPDIR/build</code></pre>
+      <h2 id="cache-walk-through">Cache Walk-Through</h2>
+      <p>The following figure shows the high-level interface for our
+      cache. The cache has two memory interfaces. One enables the
+      processor to send memory requests and receive responses from the
+      cache, and the other enables the cache to send memory requests and
+      receive responses from main memory. All interfaces are implemented
+      using the latency-insensitive val/rdy micro-protocol.</p>
+      <p><img src="assets/fig/lab3-mem-ifc.png" /></p>
+      <p>We provide students a trivial functional-level model of a cache
+      which essentially just directly forwards requests from the
+      processor to main memory and then directly forwards reponses from
+      main memory back to the processor. You can find the FL model in
+      <code>lab3_mem/CacheFL.py</code>. This is what the interface looks
+      like in Verilog for an RTL implementation of the cache.</p>
+      <pre><code>module lab3_mem_CacheSimple
+#(
+  parameter p_num_banks = 1 // Total number of cache banks
+)
+(
+  input  logic          clk,
+  input  logic          reset,
+
+  // Processor &lt;-&gt; Cache Interface
+
+  input  mem_req_4B_t   proc2cache_reqstream_msg,
+  input  logic          proc2cache_reqstream_val,
+  output logic          proc2cache_reqstream_rdy,
+
+  output mem_resp_4B_t  proc2cache_respstream_msg,
+  output logic          proc2cache_respstream_val,
+  input  logic          proc2cache_respstream_rdy,
+
+  // Cache &lt;-&gt; Memory Interface
+
+  output mem_req_16B_t  cache2mem_reqstream_msg,
+  output logic          cache2mem_reqstream_val,
+  input  logic          cache2mem_reqstream_rdy,
+
+  input  mem_resp_16B_t cache2mem_respstream_msg,
+  input  logic          cache2mem_respstream_val,
+  output logic          cache2mem_respstream_rdy
+);</code></pre>
+      <p>Notice that we are using SystemVerilog structs to encode the
+      memory requests and responses. Here is the memory request struct
+      format:</p>
+      <pre><code> 76  74 73           66 65              34 33  32 31               0
++------+---------------+------------------+------+------------------+
+| type | opaque        | addr             | len  | data             |
++------+---------------+------------------+------+------------------+</code></pre>
+      <p>And here is the memory response struct format:</p>
+      <pre><code> 46  44 43           36 35  34 33  32 31               0
++------+---------------+------+------+------------------+
+| type | opaque        | test | len  | data             |
++------+---------------+------+------+------------------+</code></pre>
+      <p>The baseline implementation for this lab will be a 256B
+      direct-mapped cache with 16B cache lines and a write-back,
+      write-allocate write policy. In this discussion section, we
+      provide you a simple cache that partially implements the write
+      init transaction. The block diagram for how the datapath unit is
+      shown below.</p>
+      <p><img src="assets/fig/lab3-mem-simple-dpath.png" /></p>
+      <p>Here is the FSM for the write init transaction.</p>
+      <p><img src="assets/fig/lab3-mem-simple-ctrl.png" /></p>
+      <p>Take a look at the code in the following files to learn more
+      about how the simple cache is implemented.</p>
+      <ul>
+      <li><code>lab3_mem/CacheSimpleDpath.v</code></li>
+      <li><code>lab3_mem/CacheSimpleCtrl.v</code></li>
+      <li><code>lab3_mem/CacheSimple.v</code></li>
+      </ul>
+      <h2 id="using-the-cache-functional-level-model">Using the Cache
+      Functional-Level Model</h2>
+      <p>Let’s take a look at a basic test for the write init
+      transaction. They primary way we will test our processors is by
+      writing very small sequences of memory requests and the expected
+      memory responses. Take a look at the test in
+      <code>lab3_mem/test/simple_test.py</code> to see how to write such
+      tests.</p>
+      <pre><code>def test( cmdline_opts ):
+
+  msgs = [
+    #    type  opq  addr    len data                type  opq  test len data
+    req( &#39;in&#39;, 0x0, 0x1000, 0, 0xdeadbeef ), resp( &#39;in&#39;,  0x0, 0,   0,  0          ),
+  ]
+
+  model = TestHarness( CacheFL(), msgs[::2], msgs[1::2] )
+
+  run_sim( model, cmdline_opts, duts=[&#39;cache&#39;] )</code></pre>
+      <p>We use helper python functions to create the desired memory
+      requests and expected memory responses. This test has a single
+      write init transaction. As awlays, you should always make sure
+      your tests pass on the FL model before using them to test your RTL
+      model. Let’s run the above test on our FL model.</p>
+      <pre><code>% cd $TOPDIR/build
+% pytest ../lab3_mem/test/simple_test.py -s</code></pre>
+      <p>Use the <code>-s</code> command line option so you can see the
+      linetrace. Verify that you can see the stream source sending
+      memory requests to cache which then forwards those requests to
+      main memory. Also verify that you can see the corresponding
+      response coming back from main memory to the cache which then
+      forwards this response back to the stream sink.</p>
+      <h2
+      id="implementing-and-testing-the-write-init-transaction">Implementing
+      and Testing the Write Init Transaction</h2>
+      <p>Let’s try the same test on the RTL implementation of the simple
+      cache. Modify <code>run_test</code> to use the
+      <code>CacheSimple</code> like this:</p>
+      <pre><code>run_sim( CacheSimple, cmdline_opts, duts=[&#39;cache&#39;] )</code></pre>
+      <p>Then rerun the test. The test will not pass since we have not
+      implemented the write init transaction yet.</p>
+      <p>The first step is to figure out the address mapping. Find the
+      address mapping code in the
+      <code>lab3_mem/CacheSimpleDpath.v</code>:</p>
+      <pre><code>// Address Mapping
+
+logic  [1:0] cachereq_addr_byte_offset;
+logic  [1:0] cachereq_addr_word_offset;
+logic  [3:0] cachereq_addr_index;
+logic [23:0] cachereq_addr_tag;
+
+generate
+  if ( p_num_banks == 1 ) begin
+    // assign cachereq_addr_byte_offset = cachereq_addr[??:??];
+    // assign cachereq_addr_word_offset = cachereq_addr[??:??];
+    // assign cachereq_addr_index       = cachereq_addr[??:??];
+    // assign cachereq_addr_tag         = cachereq_addr[??:??];
+  end
+  else if ( p_num_banks == 4 ) begin
+    // handle address mapping for four banks
+  end
+endgenerate</code></pre>
+      <p>Note that your cache needs to support a four-bank
+      configuration, but this should be one of the last features you
+      implement. Uncomment and fill in the <code>??</code> to extract
+      the byte offset, word offset, index, and tag from the cache
+      request address.</p>
+      <p>The second step is to implement the FSM. Start by implementing
+      the state transition logic, and then implement the state output
+      table. We have implemented the IDLE state for you. The seven
+      control signals are shown in the datapath diagram. The valid bit
+      input and valid write enable signals in the state output table are
+      used to control the valid bits which are stored in the control
+      unit.</p>
+      <p>Once you have implemented the address map, strate transition
+      logic, and the state output table, rerun our simple test.</p>
+      <pre><code>% cd $TOPDIR/build
+% pytest ../lab3_mem/test/simple_test.py -s</code></pre>
+      <p>You should see a line trace like this:</p>
+      <pre><code>                                        tag array
+                                    -------------------
+    cachereq                   state 0   1   2       16                      cacheresp
+ 1r                           &gt; (I [ - | - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 2r                           &gt; (I [ - | - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 3:                           &gt; (I [ - | - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 4: in:00:00001000:0:deadbeef &gt; (I [ - | - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 5: .                         &gt; (TC[ - | - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 6: .                         &gt; (IN[ - | - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 7: .                         &gt; (W [010| - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt; in:00:0:0:00000000
+ 8:                           &gt; (I [010| - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+ 9:                           &gt; (I [010| - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+10:                           &gt; (I [010| - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+11:                           &gt; (I [010| - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;
+12:                           &gt; (I [010| - | - |...| - ]) &gt; [ ]...&gt;...[  ] &gt;</code></pre>
+      <p>You can see the write init request going into the cache on
+      cycle 4, the cache transitioning through the I -&gt; TC -&gt; IN
+      -&gt; W states, the tag array being updated in the IN state, and
+      the write init resopnse being returned from the cache on cycle
+      7.</p>
+      <h2 id="more-testing">More Testing</h2>
+      <p>Add a second write init transaction in the given test case. Use
+      an address which results in the second write init transaction
+      writing the second set in the cache. Run the test and verify from
+      the line trace that the tags in set 0 and set 1 are now valid.</p>
+      <p>Now add a total of 16 write init transactions. Each transaction
+      should go to a different set in the cache. Verify the cache is
+      functioning as expected using the line trace.</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-credits">This page was generated
+        with Pandoc using a modified version of the Cayman theme.</span>
+      </footer>
+    </section>
+  </body>
+</html>

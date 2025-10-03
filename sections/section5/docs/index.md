@@ -153,7 +153,7 @@ step. If you spot something obvious skip to step 9.
 **Step 7: Zoom in on the buggy cycle in the waveform**
 
 Use the `--dump-vcd` option to generate a VCD file. Open the VCD
-file in gtkwave. Add the clock, reset, and key signals (e.g.,
+file in Surfer. Add the clock, reset, and key signals (e.g.,
 `inst_D`, `inst_X`, `inst_M`, `inst_W`) to the waveform
 view. Use the narrowed focus from Step 6 to zoom in on a specific cycle
 and a specific part of the design where you can clearly see a specific
