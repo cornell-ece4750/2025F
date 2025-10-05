@@ -10,4 +10,4 @@ document in the repo here:
 
 Or online here:
 
- - https://cornell-ece4750.github.io/ece4750-sec08-mem
+ - https://cornell-ece4750.github.io/2025F/sections/section6/docs/
