@@ -167,8 +167,8 @@ We will discuss these queues in the discussion section and also
 experiment with RTL implementations of these queues:
 
     % cd $TOPDIR/build
-    % pytest ../lab3_mem/test/NormalQueue1_test.py -s
-    % pytest ../lab3_mem/test/NormalQueue2_test.py -s
-    % pytest ../lab3_mem/test/PipeQueue1_test.py -s
-    % pytest ../lab3_mem/test/BypassQueue1_test.py -s
+    % pytest ../sec08_queues/test/NormalQueue1_test.py -s
+    % pytest ../sec08_queues/test/NormalQueue2_test.py -s
+    % pytest ../sec08_queues/test/PipeQueue1_test.py -s
+    % pytest ../sec08_queues/test/BypassQueue1_test.py -s
 
