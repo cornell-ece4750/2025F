@@ -1,0 +1,26 @@
+#=========================================================================
+# Modular C++ Build System Subproject Makefile Fragment
+#=========================================================================
+# Please read the documenation in 'mcppbs-uguide.txt' for more details
+# on how the Modular C++ Build System works.
+
+ubmark_intdeps  = @ubmark_intdeps@
+ubmark_cppflags = @ubmark_cppflags@
+ubmark_ldflags  = @ubmark_ldflags@
+ubmark_libs     = @ubmark_libs@
+
+ubmark_hdrs = \
+  ubmark-vvadd.h \
+  ubmark-accumulate.h \
+
+ubmark_srcs = \
+  ubmark-vvadd.c \
+  ubmark-accumulate.c \
+
+ubmark_test_srcs = \
+  ubmark-vvadd-test.c \
+  ubmark-accumulate-test.c \
+
+ubmark_prog_srcs = \
+  ubmark-vvadd-eval.c \
+  ubmark-accumulate-eval.c \
